@@ -18,15 +18,15 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
 
-    /* ซ่อน Elements ของ Streamlit เวลาสั่ง Print */
+    /* CSS สำหรับการพิมพ์: ซ่อนส่วนที่ไม่ต้องการ */
     @media print {
-        .stAppHeader, .stSidebar, .stToolbar { display: none !important; }
-        .no-print { display: none !important; }
+        .no-print, .stAppHeader, .stSidebar, .stToolbar { display: none !important; }
         .main-content { margin: 0; padding: 0; }
         @page { margin: 0.5cm; size: A4; }
+        body { -webkit-print-color-adjust: exact; }
     }
 
-    /* สไตล์ปุ่ม Print (เลียนแบบ Screenshot สีเขียว) */
+    /* ดีไซน์ปุ่มพิมพ์ตามรูป Screenshot (สีเขียว) */
     .print-btn-custom {
         background-color: #4CAF50; /* Green */
         border: none;
@@ -38,21 +38,26 @@ st.markdown("""
         font-size: 16px;
         margin-bottom: 20px;
         cursor: pointer;
-        border-radius: 4px; /* Rounded corners */
+        border-radius: 5px; 
         font-family: 'Sarabun', sans-serif;
         font-weight: bold;
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         transition: 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 auto; /* Center button */
     }
     .print-btn-custom:hover {
         background-color: #45a049;
         box-shadow: 0 4px 8px rgba(0,0,0,0.3);
     }
     .btn-container {
-        text-align: center;
+        display: flex;
+        justify-content: center;
         width: 100%;
-        margin-top: 10px;
-        margin-bottom: 10px;
+        margin-top: 20px;
+        margin-bottom: 20px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -60,6 +65,19 @@ st.markdown("""
 # ==========================================
 # 2. DATABASE & CONSTANTS
 # ==========================================
+# Case Descriptions
+CASE_DESC = {
+    1: "All Continuous",
+    2: "Short Discontinuous",
+    3: "Long Discontinuous",
+    4: "2 Short + 1 Long Discont.",
+    5: "2 Long + 1 Short Discont.",
+    6: "2 Adjacent Discont.",
+    7: "1 Short Discont.",
+    8: "1 Long Discont.",
+    9: "All Discontinuous"
+}
+
 # ACI Method 2 Coefficients (Case 1-9)
 ACI_COEFFICIENTS = {
     1: {1.00: [0.033, 0.018, 0.027, 0.033, 0.018, 0.027], 0.95: [0.036, 0.020, 0.030, 0.033, 0.017, 0.026],
@@ -116,7 +134,6 @@ def fmt(n, digits=2):
 
 
 def get_coefficients(case_num, m):
-    # m should be between 0.5 and 1.0
     m = max(0.5, min(1.0, m))
     table = ACI_COEFFICIENTS[case_num]
     if m in table: return table[m]
@@ -207,10 +224,10 @@ def plot_twoway_section(h_cm, cover_cm, main_bar, s_main):
 
 
 # ==========================================
-# 5. CALCULATION LOGIC (Detailed)
+# 5. CALCULATION LOGIC (With Detailed Spacing)
 # ==========================================
 def calculate_detailed(inputs):
-    rows = []  # [Item, Formula, Substitution, Result, Unit, Status]
+    rows = []
 
     def sec(title):
         rows.append(["SECTION", title, "", "", "", ""])
@@ -224,6 +241,8 @@ def calculate_detailed(inputs):
     cov = inputs['cover']
     fc = inputs['fc'];
     fy = inputs['fy']
+    bar_name = inputs['bar']
+    Ab = BAR_INFO[bar_name]['A_cm2']
 
     # 1. Geometry
     sec("1. GEOMETRY & LOADS")
@@ -242,16 +261,17 @@ def calculate_detailed(inputs):
     row("Factored Load (wu)", "1.4DL + 1.7LL", f"1.4({w_dl:.0f}) + 1.7({w_ll})", f"{wu:.0f}", "kg/m²")
 
     # 2. Moments & Design
-    sec(f"2. MOMENT & REINFORCEMENT (CASE {inputs['case']})")
-    coefs = get_coefficients(inputs['case'], m)
-    # coefs = [Ca_neg, Ca_dl, Ca_ll, Cb_neg, Cb_dl, Cb_ll]
+    case_id = inputs['case']
+    sec(f"2. MOMENT & REINFORCEMENT (CASE {case_id}: {CASE_DESC[case_id]})")
+    coefs = get_coefficients(case_id, m)
 
     # Effective Depth
-    db = BAR_INFO[inputs['bar']]['d_mm']
+    db = BAR_INFO[bar_name]['d_mm']
     d_short = h - cov - db / 20
     d_long = d_short - db / 10  # Upper layer
+    S = Lx  # Short span length for moment calc
 
-    # Helper for As
+    # Helper functions
     def calc_As(Mu_val, d_val):
         Mu_kgcm = Mu_val * 100
         Rn = Mu_kgcm / (0.9 * 100 * d_val ** 2)
@@ -262,46 +282,58 @@ def calculate_detailed(inputs):
         As_req = max(rho * 100 * d_val, 0.0018 * 100 * h)
         return As_req
 
-    # Moments (Using Short Span Lx for ALL Method 2 calc as per standard S^2)
-    S = Lx
+    def calc_spacing(As_req):
+        s = (Ab * 100) / As_req
+        s_final = math.floor(min(s, 3 * h, 45) * 2) / 2
+        return s, s_final
 
-    # -- Short Neg --
+    # --- Short Neg (Top) ---
     Ma_neg = coefs[0] * wu * S ** 2
     As_a_neg = calc_As(Ma_neg, d_short)
-    row("Ma (Neg)", "Ca_neg · wu · Lx²", f"{coefs[0]:.3f}·{wu:.0f}·{S}²", f"{Ma_neg:.2f}", "kg-m")
-    row("As (Short-Neg)", "Calc", f"d={d_short:.2f}", f"{As_a_neg:.2f}", "cm²")
+    s_calc_a_neg, s_a_neg = calc_spacing(As_a_neg)
 
-    # -- Short Pos --
+    row("Ma (Neg)", "Ca_neg · wu · Lx²", f"{coefs[0]:.3f}·{wu:.0f}·{S}²", f"{Ma_neg:.2f}", "kg-m")
+    row("As (Short-Neg)", "Calc (Flexure)", f"d={d_short:.2f}", f"{As_a_neg:.2f}", "cm²")
+    # Spacing row
+    row("• Spacing (Neg)", f"Ab·100/As (Max {3 * h:.0f}, 45)", f"{Ab:.2f}·100/{As_a_neg:.2f} = {s_calc_a_neg:.1f}",
+        f"@{s_a_neg:.1f}", "cm", "OK")
+
+    # --- Short Pos (Bot) ---
     Ma_pos = (coefs[1] * 1.4 * w_dl * S ** 2) + (coefs[2] * 1.7 * w_ll * S ** 2)
     As_a_pos = calc_As(Ma_pos, d_short)
-    row("Ma (Pos)", "Ca_dl·1.4D + Ca_ll·1.7L", f"Details omitted", f"{Ma_pos:.2f}", "kg-m")
-    row("As (Short-Pos)", "Calc", f"d={d_short:.2f}", f"{As_a_pos:.2f}", "cm²")
+    s_calc_a_pos, s_a_pos = calc_spacing(As_a_pos)
 
-    # -- Long Neg --
+    row("Ma (Pos)", "Ca_dl·1.4D + Ca_ll·1.7L", f"Details omitted", f"{Ma_pos:.2f}", "kg-m")
+    row("As (Short-Pos)", "Calc (Flexure)", f"d={d_short:.2f}", f"{As_a_pos:.2f}", "cm²")
+    row("• Spacing (Pos)", f"Ab·100/As (Max {3 * h:.0f}, 45)", f"{Ab:.2f}·100/{As_a_pos:.2f} = {s_calc_a_pos:.1f}",
+        f"@{s_a_pos:.1f}", "cm", "OK")
+
+    # --- Long Neg (Top) ---
     Mb_neg = coefs[3] * wu * S ** 2
     As_b_neg = calc_As(Mb_neg, d_long)
-    row("Mb (Neg)", "Cb_neg · wu · Lx²", f"{coefs[3]:.3f}·{wu:.0f}·{S}²", f"{Mb_neg:.2f}", "kg-m")
-    row("As (Long-Neg)", "Calc", f"d={d_long:.2f}", f"{As_b_neg:.2f}", "cm²")
+    s_calc_b_neg, s_b_neg = calc_spacing(As_b_neg)
 
-    # -- Long Pos --
+    row("Mb (Neg)", "Cb_neg · wu · Lx²", f"{coefs[3]:.3f}·{wu:.0f}·{S}²", f"{Mb_neg:.2f}", "kg-m")
+    row("As (Long-Neg)", "Calc (Flexure)", f"d={d_long:.2f}", f"{As_b_neg:.2f}", "cm²")
+    row("• Spacing (Neg)", f"Ab·100/As (Max {3 * h:.0f}, 45)", f"{Ab:.2f}·100/{As_b_neg:.2f} = {s_calc_b_neg:.1f}",
+        f"@{s_b_neg:.1f}", "cm", "OK")
+
+    # --- Long Pos (Bot) ---
     Mb_pos = (coefs[4] * 1.4 * w_dl * S ** 2) + (coefs[5] * 1.7 * w_ll * S ** 2)
     As_b_pos = calc_As(Mb_pos, d_long)
+    s_calc_b_pos, s_b_pos = calc_spacing(As_b_pos)
+
     row("Mb (Pos)", "Cb_dl·1.4D + Cb_ll·1.7L", f"Details omitted", f"{Mb_pos:.2f}", "kg-m")
-    row("As (Long-Pos)", "Calc", f"d={d_long:.2f}", f"{As_b_pos:.2f}", "cm²")
-
-    # Spacing
-    Ab = BAR_INFO[inputs['bar']]['A_cm2']
-
-    def get_s(As):
-        return math.floor(min((Ab * 100) / As, 3 * h, 45) * 2) / 2
+    row("As (Long-Pos)", "Calc (Flexure)", f"d={d_long:.2f}", f"{As_b_pos:.2f}", "cm²")
+    row("• Spacing (Pos)", f"Ab·100/As (Max {3 * h:.0f}, 45)", f"{Ab:.2f}·100/{As_b_pos:.2f} = {s_calc_b_pos:.1f}",
+        f"@{s_b_pos:.1f}", "cm", "OK")
 
     res_sum = {
-        's_a_neg': get_s(As_a_neg), 's_a_pos': get_s(As_a_pos),
-        's_b_neg': get_s(As_b_neg), 's_b_pos': get_s(As_b_pos)
+        's_a_neg': s_a_neg, 's_a_pos': s_a_pos,
+        's_b_neg': s_b_neg, 's_b_pos': s_b_pos
     }
 
     sec("3. CHECK SHEAR")
-    # Approximate Shear for Two-way (Simplified Conservative: wu * Lx / 3)
     Vu = wu * Lx / 3
     Vc = 0.53 * math.sqrt(fc) * 100 * d_short
     phiVc = 0.85 * Vc
@@ -312,10 +344,9 @@ def calculate_detailed(inputs):
 
 
 # ==========================================
-# 6. HTML REPORT GENERATOR (Table Format)
+# 6. HTML REPORT GENERATOR
 # ==========================================
 def generate_html_report(inputs, rows, img_base64, res_sum):
-    # Table Content
     table_rows = ""
     for r in rows:
         if r[0] == "SECTION":
@@ -327,8 +358,11 @@ def generate_html_report(inputs, rows, img_base64, res_sum):
             elif "WARN" in r[5]:
                 status_class = "pass-warn"
 
+            # Highlight Spacing Rows
+            bg_style = "background-color:#f9fbe7;" if "Spacing" in r[0] else ""
+
             table_rows += f"""
-            <tr>
+            <tr style="{bg_style}">
                 <td>{r[0]}</td>
                 <td>{r[1]}</td>
                 <td>{r[2]}</td>
@@ -355,15 +389,23 @@ def generate_html_report(inputs, rows, img_base64, res_sum):
             .pass-ok {{ color: green; font-weight: bold; }}
             .pass-no {{ color: red; font-weight: bold; }}
 
-            /* Footer */
             .footer {{ margin-top: 40px; page-break-inside: avoid; }}
             .sign-box {{ width: 250px; text-align: center; margin-top: 20px; }}
             .line {{ border-bottom: 1px solid #000; margin: 30px 0 5px 0; }}
+
+            /* Class to hide elements when printing */
+            @media print {{
+               .no-print {{ display: none !important; }}
+            }}
         </style>
     </head>
     <body>
-        <div class="no-print btn-container">
-            <button onclick="window.print()" class="print-btn-custom">
+        <div class="no-print" style="text-align: center; margin-bottom: 20px;">
+            <button onclick="window.print()" style="
+                background-color: #4CAF50; border: none; color: white; padding: 12px 24px;
+                text-align: center; display: inline-flex; align-items: center; gap: 8px;
+                font-size: 16px; cursor: pointer; border-radius: 5px; font-family: 'Sarabun'; font-weight: bold;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
                 🖨️ Print This Page / พิมพ์หน้านี้
             </button>
         </div>
@@ -452,7 +494,10 @@ with st.sidebar.form("input_form"):
     fy = st.number_input("fy (ksc)", value=4000.0, min_value=0.0)
 
     st.header("3. Design Parameters")
-    case = st.selectbox("Case Type (Edge Conditions)", range(1, 10), index=0)
+    # Updated: Format the dropdown to show ID + Description
+    case = st.selectbox("Case Type (Edge Conditions)", range(1, 10), index=0,
+                        format_func=lambda x: f"{x}: {CASE_DESC[x]}")
+
     bar = st.selectbox("Rebar Size", list(BAR_INFO.keys()), index=1)
 
     run_btn = st.form_submit_button("Calculate & Preview")
