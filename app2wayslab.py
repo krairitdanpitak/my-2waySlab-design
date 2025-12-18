@@ -131,14 +131,20 @@ def fig_to_base64(fig):
 
 
 # ==========================================
-# 4. PLOTTING FUNCTION (IMPROVED)
+# 4. PLOTTING FUNCTION (IMPROVED - FIXED VISUAL THICKNESS)
 # ==========================================
-def plot_twoway_section_detailed(h_cm, cover_cm, bar_name, res_sum):
+def plot_twoway_section_detailed(h_cm, cover_cm, bar_name, res_sum, Lx_val):
     fig, ax = plt.subplots(figsize=(10, 5))
     beam_w = 0.30;
     beam_d = 0.50;
-    slab_span = 2.5;
-    slab_h = h_cm / 100.0
+    slab_span = 2.5
+
+    # ---------------------------------------------
+    # FIXED VISUAL THICKNESS for Clarity
+    # ---------------------------------------------
+    # Instead of scaling h_cm directly which might be too thin (e.g. 0.10),
+    # we use a fixed schematic height for drawing to ensure bars are separated.
+    slab_h_draw = 0.25  # Schematic drawing height (fixed)
 
     # --- 1. Structure ---
     # Beams
@@ -146,77 +152,82 @@ def plot_twoway_section_detailed(h_cm, cover_cm, bar_name, res_sum):
         patches.Rectangle((-beam_w, -beam_d), beam_w, beam_d, facecolor='white', edgecolor='black', linewidth=1.5))
     ax.add_patch(
         patches.Rectangle((slab_span, -beam_d), beam_w, beam_d, facecolor='white', edgecolor='black', linewidth=1.5))
-    # Slab
-    ax.add_patch(
-        patches.Rectangle((0, -slab_h), slab_span, slab_h, facecolor='#f9f9f9', edgecolor='black', linewidth=1.5))
+    # Slab (Using fixed schematic height)
+    ax.add_patch(patches.Rectangle((0, -slab_h_draw), slab_span, slab_h_draw, facecolor='#f9f9f9', edgecolor='black',
+                                   linewidth=1.5))
 
-    pad = 0.02 + (cover_cm / 100)
+    # Padding for schematic
+    pad = 0.04
 
     # --- 2. Short Span Bars (Lines) ---
     bar_y_top = -pad
-    bar_y_bot = -slab_h + pad
+    bar_y_bot = -slab_h_draw + pad
     top_len = slab_span * 0.25
 
     # Short Neg (Top Line)
-    ax.plot([-beam_w + 0.05, -beam_w + 0.05, top_len], [-beam_d / 2, bar_y_top, bar_y_top], color='black',
-            linewidth=2.0)  # Left
+    ax.plot([-beam_w + 0.05, -beam_w + 0.05, top_len], [-beam_d / 2, bar_y_top, bar_y_top], color='blue',
+            linewidth=2.5)  # Left
     ax.plot([slab_span + beam_w - 0.05, slab_span + beam_w - 0.05, slab_span - top_len],
-            [-beam_d / 2, bar_y_top, bar_y_top], color='black', linewidth=2.0)  # Right
+            [-beam_d / 2, bar_y_top, bar_y_top], color='blue', linewidth=2.5)  # Right
 
     # Short Pos (Bot Line)
-    ax.plot([0.1, slab_span - 0.1], [bar_y_bot, bar_y_bot], color='black', linewidth=2.0)
-    ax.plot([0.1, 0.1], [bar_y_bot, bar_y_bot + 0.05], color='black', linewidth=2.0)  # Hook
-    ax.plot([slab_span - 0.1, slab_span - 0.1], [bar_y_bot, bar_y_bot + 0.05], color='black', linewidth=2.0)  # Hook
+    ax.plot([0.1, slab_span - 0.1], [bar_y_bot, bar_y_bot], color='blue', linewidth=2.5)
+    ax.plot([0.1, 0.1], [bar_y_bot, bar_y_bot + 0.06], color='blue', linewidth=2.5)  # Hook
+    ax.plot([slab_span - 0.1, slab_span - 0.1], [bar_y_bot, bar_y_bot + 0.06], color='blue', linewidth=2.5)  # Hook
 
     # --- 3. Long Span Bars (Dots) ---
-    dot_y_top = bar_y_top - 0.015  # Under Short Top
-    dot_y_bot = bar_y_bot + 0.015  # Over Short Bot
+    dot_y_top = bar_y_top - 0.025  # Under Short Top
+    dot_y_bot = bar_y_bot + 0.025  # Over Short Bot
 
     # Long Neg (Top Dots)
     for x in [0, 0.15, slab_span, slab_span - 0.15]:
-        ax.add_patch(patches.Circle((x, dot_y_top), radius=0.015, color='black'))
+        ax.add_patch(patches.Circle((x, dot_y_top), radius=0.02, color='red'))
 
     # Long Pos (Bot Dots)
     for i in range(1, 8):
-        ax.add_patch(patches.Circle((slab_span / 8 * i, dot_y_bot), radius=0.015, color='black'))
+        ax.add_patch(patches.Circle((slab_span / 8 * i, dot_y_bot), radius=0.02, color='red'))
 
     # --- 4. Dimensions & Annotations ---
 
-    # Dimension: Thickness (h)
-    ax.annotate("", xy=(slab_span + beam_w + 0.1, -slab_h), xytext=(slab_span + beam_w + 0.1, 0),
+    # Dimension: Thickness (h) - Shows ACTUAL value
+    ax.annotate("", xy=(slab_span + beam_w + 0.1, -slab_h_draw), xytext=(slab_span + beam_w + 0.1, 0),
                 arrowprops=dict(arrowstyle='<->', linewidth=0.8))
-    ax.text(slab_span + beam_w + 0.15, -slab_h / 2, f"h = {h_cm / 100:.2f} m", va='center', rotation=90)
+    ax.text(slab_span + beam_w + 0.15, -slab_h_draw / 2, f"h = {h_cm / 100:.2f} m", va='center', rotation=90)
 
-    # Dimension: Span (L)
+    # Dimension: Span (L) - Shows ACTUAL Lx Value
     ax.annotate("", xy=(0, -beam_d - 0.1), xytext=(slab_span, -beam_d - 0.1),
                 arrowprops=dict(arrowstyle='<->', linewidth=0.8))
-    ax.text(slab_span / 2, -beam_d - 0.2, "Span L", ha='center')
+    ax.text(slab_span / 2, -beam_d - 0.2, f"L = {Lx_val:.2f} m", ha='center', fontweight='bold')
 
     # --- 5. Labels with Leader Lines ---
 
     # Short Span (Neg/Top)
     txt_short_neg = f"Short(Top): {bar_name}@{res_sum['s_a_neg']:.0f}cm"
     ax.annotate(txt_short_neg, xy=(top_len / 2, bar_y_top), xytext=(top_len, 0.4),
-                arrowprops=dict(arrowstyle='->', connectionstyle="angle,angleA=0,angleB=90,rad=10"), fontsize=9,
-                bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.9))
+                arrowprops=dict(arrowstyle='->', connectionstyle="angle,angleA=0,angleB=90,rad=10", color='blue'),
+                fontsize=9, color='blue', fontweight='bold',
+                bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="blue", alpha=0.9))
 
     # Long Span (Neg/Top) - Pointing to dots
     txt_long_neg = f"Long(Top): {bar_name}@{res_sum['s_b_neg']:.0f}cm"
     ax.annotate(txt_long_neg, xy=(0.15, dot_y_top), xytext=(0.5, 0.2),
-                arrowprops=dict(arrowstyle='->'), fontsize=9,
-                bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.9))
+                arrowprops=dict(arrowstyle='->', color='red'),
+                fontsize=9, color='red', fontweight='bold',
+                bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="red", alpha=0.9))
 
     # Short Span (Pos/Bot)
     txt_short_pos = f"Short(Bot): {bar_name}@{res_sum['s_a_pos']:.0f}cm"
     ax.annotate(txt_short_pos, xy=(slab_span / 2, bar_y_bot), xytext=(slab_span / 2, -0.6),
-                arrowprops=dict(arrowstyle='->'), fontsize=9, ha='center',
-                bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.9))
+                arrowprops=dict(arrowstyle='->', color='blue'),
+                fontsize=9, ha='center', color='blue', fontweight='bold',
+                bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="blue", alpha=0.9))
 
     # Long Span (Pos/Bot) - Pointing to dots
     txt_long_pos = f"Long(Bot): {bar_name}@{res_sum['s_b_pos']:.0f}cm"
     ax.annotate(txt_long_pos, xy=(slab_span / 2 + 0.3, dot_y_bot), xytext=(slab_span / 2 + 0.6, -0.4),
-                arrowprops=dict(arrowstyle='->'), fontsize=9,
-                bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.9))
+                arrowprops=dict(arrowstyle='->', color='red'),
+                fontsize=9, color='red', fontweight='bold',
+                bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="red", alpha=0.9))
 
     ax.axis('off')
     ax.set_ylim(-1.0, 0.6)
@@ -458,7 +469,8 @@ if run_btn:
     }
 
     rows, res_sum = calculate_detailed(inputs)
-    img_base64 = fig_to_base64(plot_twoway_section_detailed(h, cover, bar, res_sum))
+    # Pass Lx to plot function for Dimension Label
+    img_base64 = fig_to_base64(plot_twoway_section_detailed(h, cover, bar, res_sum, Lx))
     html_report = generate_html_report(inputs, rows, img_base64, res_sum)
 
     st.success("✅ Design Complete! See report below.")
