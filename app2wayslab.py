@@ -11,7 +11,7 @@ import streamlit.components.v1 as components
 from datetime import date
 
 # ==========================================
-# 1. SETUP & CSS (MATCHING UI & REPORT)
+# 1. CSS & UI STYLING (MATCHING SCREENSHOTS)
 # ==========================================
 st.set_page_config(page_title="RC Slab Design SDM", layout="wide")
 
@@ -21,8 +21,10 @@ st.markdown("""
 
     body { font-family: 'Sarabun', sans-serif; }
 
-    /* 1. SUCCESS BOX (Green Background) */
-    .success-box {
+    /* 1. SUCCESS MESSAGE BOX (Green Background) */
+    .stAlert { display: none; } /* Hide default streamlit alerts if used */
+
+    .custom-success-box {
         background-color: #d1e7dd;
         color: #0f5132;
         padding: 15px;
@@ -35,14 +37,12 @@ st.markdown("""
         margin-bottom: 20px;
         font-size: 16px;
     }
-    .success-icon { margin-right: 10px; font-size: 18px; }
 
     /* 2. PRINT BUTTON (Green Solid) */
-    .print-container { text-align: center; margin: 20px 0; }
     .print-btn-green {
         background-color: #28a745; 
         color: white !important; 
-        padding: 12px 25px;
+        padding: 12px 24px;
         border: none; 
         border-radius: 5px; 
         font-family: 'Sarabun', sans-serif;
@@ -50,78 +50,83 @@ st.markdown("""
         cursor: pointer; 
         text-decoration: none;
         display: inline-block; 
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         font-size: 16px;
+        margin-top: 10px;
     }
     .print-btn-green:hover { background-color: #218838; }
+    .print-icon { margin-right: 8px; }
 
-    /* 3. REPORT LAYOUT (A4) */
+    /* 3. REPORT CONTAINER (A4 Paper Style) */
     .report-container {
         font-family: 'Sarabun', sans-serif;
         max-width: 210mm;
         margin: 0 auto;
         padding: 40px;
         background-color: white;
+        color: black;
     }
 
-    .report-header { text-align: center; margin-bottom: 25px; }
-    .report-title { font-size: 24px; font-weight: bold; color: #000; margin: 0; }
-    .report-subtitle { font-size: 16px; font-weight: bold; color: #333; margin-top: 5px; }
+    /* HEADERS */
+    .report-title { font-size: 24px; font-weight: bold; text-align: center; margin-bottom: 5px; text-transform: uppercase; }
+    .report-subtitle { font-size: 18px; font-weight: bold; text-align: center; margin-bottom: 30px; }
     .id-box { 
         float: right; 
-        border: 1px solid #000; 
-        padding: 3px 10px; 
+        border: 2px solid #000; 
+        padding: 5px 15px; 
         font-weight: bold; 
-        font-size: 14px;
-        margin-top: -30px; 
+        font-size: 16px;
+        margin-top: -50px;
     }
 
+    /* INFO SECTION */
     .info-box {
         border: 1px solid #ccc;
         background-color: #f8f9fa;
-        padding: 15px;
+        padding: 20px;
         border-radius: 4px;
-        font-size: 13px;
-        margin-bottom: 20px;
+        font-size: 14px;
+        margin-bottom: 25px;
         display: flex;
         justify-content: space-between;
     }
     .info-col { width: 48%; line-height: 1.6; }
 
-    /* 4. CALC TABLE (6 Columns) */
-    .calc-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 15px; }
+    /* SUMMARY CARDS */
+    .summary-grid { display: flex; justify-content: space-between; margin-bottom: 30px; text-align: center; }
+    .summary-card { 
+        width: 30%; 
+        border: 1px solid #ddd; 
+        padding: 15px; 
+        border-radius: 5px;
+    }
+    .card-head { font-weight: bold; font-size: 16px; margin-bottom: 5px; }
+    .card-val { color: #0d6efd; font-weight: bold; font-size: 18px; }
+
+    /* CALC TABLE (Clean & Fixed Widths) */
+    .calc-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
     .calc-table th { 
-        background-color: #f8f9fa; 
+        background-color: #f1f3f5; 
         border: 1px solid #dee2e6; 
         padding: 10px; 
         text-align: center; 
         font-weight: bold; 
         color: #333;
     }
-    .calc-table td { border: 1px solid #dee2e6; padding: 8px; vertical-align: middle; }
-    .sec-row { background-color: #e9ecef; font-weight: bold; text-align: left; padding-left: 10px; color: #000; text-transform: uppercase; }
-    .status-ok { color: green; font-weight: bold; text-align: center; }
-    .status-fail { color: red; font-weight: bold; text-align: center; }
-    .center-val { text-align: center; }
-    .bold-val { font-weight: bold; text-align: center; }
+    .calc-table td { border: 1px solid #dee2e6; padding: 8px 10px; vertical-align: middle; }
+    .sec-row { background-color: #e9ecef; font-weight: bold; text-align: left; padding-left: 15px; color: #000; text-transform: uppercase; }
 
-    /* 5. SUMMARY CARDS */
-    .summary-grid { display: flex; justify-content: space-between; margin-bottom: 20px; }
-    .summary-card { 
-        border: 1px solid #ddd; 
-        padding: 15px; 
-        width: 30%; 
-        text-align: center; 
-        border-radius: 5px;
-    }
-    .card-title { font-weight: bold; margin-bottom: 5px; font-size: 14px; }
-    .card-val { color: #0d6efd; font-weight: bold; font-size: 16px; }
+    /* UTILS */
+    .status-pass { color: green; font-weight: bold; text-align: center; }
+    .status-fail { color: red; font-weight: bold; text-align: center; }
+    .center { text-align: center; }
+    .bold { font-weight: bold; }
 
     @media print {
         .no-print { display: none !important; }
         .report-container { width: 100%; max-width: none; padding: 0; box-shadow: none; }
-        body { background-color: white; margin: 0; }
-        @page { size: A4; margin: 1cm; }
+        body { margin: 0; background-color: white; }
+        @page { size: A4; margin: 10mm; }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -134,7 +139,8 @@ BAR_INFO = {
     'RB9': {'A_cm2': 0.636, 'd_mm': 9},
     'DB10': {'A_cm2': 0.785, 'd_mm': 10},
     'DB12': {'A_cm2': 1.131, 'd_mm': 12},
-    'DB16': {'A_cm2': 2.011, 'd_mm': 16}
+    'DB16': {'A_cm2': 2.011, 'd_mm': 16},
+    'DB20': {'A_cm2': 3.142, 'd_mm': 20}
 }
 
 ACI_METHOD2_DATA = {
@@ -205,143 +211,168 @@ def fig_to_base64(fig):
 
 
 # ==========================================
-# 3. PLOTTING (CAD STYLE - MATCHING IMAGE)
+# 3. PLOTTING (CAD STYLE - MATCHING REFERENCE IMAGE)
 # ==========================================
-def plot_slab_cad(Lx, h, cover, main_bar, s_pos, s_neg):
-    fig, ax = plt.subplots(figsize=(8, 3.5))
+def plot_slab_cad_style(Lx, h, cover, main_bar, s_pos, s_neg):
+    fig, ax = plt.subplots(figsize=(10, 4))
 
+    # Parameters
     h_m = h / 100
     cov_m = cover / 100
     beam_w = 0.25
-    drop = 0.35
+    drop = 0.40
 
-    # 1. Structure Outline
-    # Slab
-    ax.plot([0, Lx], [h_m, h_m], 'k-', lw=1.0)  # Top
-    ax.plot([0, Lx], [0, 0], 'k-', lw=1.0)  # Bot (Span)
-    # Left Support
-    ax.plot([-beam_w, 0], [h_m, h_m], 'k-', lw=1.0)
-    ax.plot([-beam_w, -beam_w], [h_m, -drop], 'k-', lw=1.0)
-    ax.plot([-beam_w, 0], [-drop, -drop], 'k-', lw=1.0)
-    ax.plot([0, 0], [-drop, 0], 'k-', lw=1.0)
-    # Right Support
-    ax.plot([Lx, Lx + beam_w], [h_m, h_m], 'k-', lw=1.0)
-    ax.plot([Lx + beam_w, Lx + beam_w], [h_m, -drop], 'k-', lw=1.0)
-    ax.plot([Lx, Lx + beam_w], [-drop, -drop], 'k-', lw=1.0)
-    ax.plot([Lx, Lx], [-drop, 0], 'k-', lw=1.0)
+    # --- DRAWING HELPERS ---
+    def draw_line(x1, y1, x2, y2, lw=1.0, ls='-'):
+        ax.plot([x1, x2], [y1, y2], color='black', linewidth=lw, linestyle=ls)
 
-    # Centerlines
-    ax.plot([-beam_w / 2, -beam_w / 2], [-drop - 0.2, h_m + 0.5], 'k-.', lw=0.5)
-    ax.plot([Lx + beam_w / 2, Lx + beam_w / 2], [-drop - 0.2, h_m + 0.5], 'k-.', lw=0.5)
+    def draw_tick_diagonal(x, y, size=0.03):
+        ax.plot([x - size, x + size], [y - size, y + size], color='black', linewidth=0.8)
 
-    # 2. Reinforcement
+    def draw_dim_line(x1, x2, y, text):
+        draw_line(x1, y, x2, y, lw=0.5)  # Main line
+        draw_tick_diagonal(x1, y)  # Ticks
+        draw_tick_diagonal(x2, y)
+        # Vertical Extension lines
+        draw_line(x1, y - 0.05, x1, y + 0.05, lw=0.3)
+        draw_line(x2, y - 0.05, x2, y + 0.05, lw=0.3)
+        # Text
+        ax.text((x1 + x2) / 2, y + 0.05, text, ha='center', va='bottom', fontsize=9)
+
+    def draw_leader_elbow(x_target, y_target, text, direction='up'):
+        # Target circle
+        ax.add_patch(patches.Circle((x_target, y_target), 0.012, color='black', fill=True))
+
+        elbow_y = y_target + 0.25 if direction == 'up' else y_target - 0.25
+        text_offset = 0.25
+
+        # Line up/down
+        draw_line(x_target, y_target, x_target, elbow_y, lw=0.6)
+        # Line horizontal
+        draw_line(x_target, elbow_y, x_target + text_offset, elbow_y, lw=0.6)
+
+        # Text
+        ax.text(x_target + text_offset + 0.05, elbow_y, text, va='center', ha='left', fontsize=9)
+
+    # --- 1. CONCRETE OUTLINE ---
+    # Top Slab
+    draw_line(0, h_m, Lx, h_m)
+    # Bottom Slab (Span)
+    draw_line(0, 0, Lx, 0)
+    # Left Beam
+    draw_line(0, 0, 0, -drop)
+    draw_line(0, -drop, -beam_w, -drop)
+    draw_line(-beam_w, -drop, -beam_w, h_m)
+    draw_line(-beam_w, h_m, 0, h_m)
+    # Right Beam
+    draw_line(Lx, 0, Lx, -drop)
+    draw_line(Lx, -drop, Lx + beam_w, -drop)
+    draw_line(Lx + beam_w, -drop, Lx + beam_w, h_m)
+    draw_line(Lx + beam_w, h_m, Lx, h_m)
+
+    # Centerlines (Dash Dot)
+    draw_line(-beam_w / 2, -drop - 0.15, -beam_w / 2, h_m + 0.4, lw=0.5, ls='-.')
+    draw_line(Lx + beam_w / 2, -drop - 0.15, Lx + beam_w / 2, h_m + 0.4, lw=0.5, ls='-.')
+
+    # --- 2. REINFORCEMENT ---
     y_bot = cov_m
     y_top = h_m - cov_m
-    ext_L = Lx / 4.0
+    ext_L = Lx / 3.5
 
-    # Bottom Bars
-    ax.plot([-beam_w + 0.05, Lx + beam_w - 0.05], [y_bot, y_bot], 'k-', lw=1.5)
-    ax.plot([-beam_w + 0.05, -beam_w + 0.05], [y_bot, y_bot + 0.08], 'k-', lw=1.5)  # Hook L
-    ax.plot([Lx + beam_w - 0.05, Lx + beam_w - 0.05], [y_bot, y_bot + 0.08], 'k-', lw=1.5)  # Hook R
+    # Bottom Bars (Continuous)
+    draw_line(-beam_w + 0.05, y_bot, Lx + beam_w - 0.05, y_bot, lw=1.5)
+    # Hooks Bottom
+    draw_line(-beam_w + 0.05, y_bot, -beam_w + 0.05, y_bot + 0.08, lw=1.5)
+    draw_line(Lx + beam_w - 0.05, y_bot, Lx + beam_w - 0.05, y_bot + 0.08, lw=1.5)
 
-    # Top Bars (Support)
+    # Top Bars (Supports)
     if s_neg > 0:
-        # Left
-        ax.plot([-beam_w + 0.05, ext_L], [y_top, y_top], 'k-', lw=1.5)
-        ax.plot([ext_L, ext_L], [y_top, y_top - 0.08], 'k-', lw=1.5)
-        # Right
-        ax.plot([Lx - ext_L, Lx + beam_w - 0.05], [y_top, y_top], 'k-', lw=1.5)
-        ax.plot([Lx - ext_L, Lx - ext_L], [y_top, y_top - 0.08], 'k-', lw=1.5)
+        # Left Top
+        draw_line(-beam_w + 0.05, y_top, ext_L, y_top, lw=1.5)
+        draw_line(ext_L, y_top, ext_L, y_top - 0.08, lw=1.5)  # Hook
+        # Right Top
+        draw_line(Lx - ext_L, y_top, Lx + beam_w - 0.05, y_top, lw=1.5)
+        draw_line(Lx - ext_L, y_top, Lx - ext_L, y_top - 0.08, lw=1.5)  # Hook
 
         # Temp Bars (Dots) Top
-        n_top = int(ext_L / 0.2)
-        for i in range(n_top + 1):
-            ax.add_patch(patches.Circle((i * 0.2, y_top - 0.015), 0.008, color='black'))
-            ax.add_patch(patches.Circle((Lx - i * 0.2, y_top - 0.015), 0.008, color='black'))
+        spacing_temp = 0.20
+        n_temp = int(ext_L / spacing_temp)
+        for i in range(n_temp + 1):
+            ax.add_patch(patches.Circle((i * spacing_temp, y_top - 0.015), 0.008, color='black'))
+            ax.add_patch(patches.Circle((Lx - i * spacing_temp, y_top - 0.015), 0.008, color='black'))
 
     # Temp Bars (Dots) Bottom
-    n_bot = int(Lx / 0.2)
+    n_bot = int(Lx / 0.20)
     for i in range(1, n_bot):
-        ax.add_patch(patches.Circle((i * 0.2, y_bot + 0.015), 0.008, color='black'))
+        ax.add_patch(patches.Circle((i * 0.20, y_bot + 0.015), 0.008, color='black'))
 
-    # 3. Dimensions & Leaders (Architectural Style)
-    def draw_dim(x1, x2, y, txt):
-        ax.plot([x1, x2], [y, y], 'k-', lw=0.5)
-        # Ticks (Diagonal)
-        tick = 0.04
-        ax.plot([x1 - 0.02, x1 + 0.02], [y - tick, y + tick], 'k-', lw=0.8)
-        ax.plot([x2 - 0.02, x2 + 0.02], [y - tick, y + tick], 'k-', lw=0.8)
-        # Verts
-        ax.plot([x1, x1], [y - 0.1, y + 0.1], 'k-', lw=0.3)
-        ax.plot([x2, x2], [y - 0.1, y + 0.1], 'k-', lw=0.3)
-        # Text
-        ax.text((x1 + x2) / 2, y + 0.05, txt, ha='center', fontsize=9)
+    # --- 3. ANNOTATIONS (CAD Style) ---
 
-    def draw_leader(x, y, txt, up=True):
-        elbow_y = y + 0.3 if up else y - 0.3
-        ax.plot([x, x], [y, elbow_y], 'k-', lw=0.5)
-        ax.plot([x, x + 0.3], [elbow_y, elbow_y], 'k-', lw=0.5)
-        ax.add_patch(patches.Circle((x, y), 0.015, color='black'))
-        ax.text(x + 0.35, elbow_y, txt, va='center', fontsize=9)
+    # Span Dimension
+    dim_y = -drop - 0.1
+    draw_dim_line(0, Lx, dim_y, f"{Lx:.2f} m.")
 
-    # Span Dim
-    draw_dim(0, Lx, -drop - 0.15, f"{Lx:.2f} m.")
-
-    # Top Dim
+    # Top Bar Extension Dimension
     if s_neg > 0:
-        draw_dim(0, ext_L, h_m + 0.2, f"{ext_L:.2f}")
-        draw_dim(Lx - ext_L, Lx, h_m + 0.2, f"{ext_L:.2f}")
+        top_dim_y = h_m + 0.15
+        draw_dim_line(0, ext_L, top_dim_y, f"{ext_L:.2f}")
+        draw_dim_line(Lx - ext_L, Lx, top_dim_y, f"{ext_L:.2f}")
 
-        # Leader Top
-        draw_leader(ext_L / 2, y_top, f"{main_bar}@{s_neg:.2f}", up=True)
-        draw_leader(Lx - ext_L / 2, y_top, f"{main_bar}@{s_neg:.2f}", up=True)
+        # Top Leaders
+        draw_leader_elbow(ext_L / 2, y_top, f"{main_bar}@{s_neg:.2f}", direction='up')
+        draw_leader_elbow(Lx - ext_L / 2, y_top, f"{main_bar}@{s_neg:.2f}", direction='up')
 
-    # Leader Bottom
-    draw_leader(Lx / 2, y_bot, f"{main_bar}@{s_pos:.2f}", up=False)
+    # Bottom Leader
+    draw_leader_elbow(Lx / 2, y_bot, f"{main_bar}@{s_pos:.2f}", direction='down')
 
-    ax.set_ylim(-0.8, h_m + 0.6)
-    ax.set_xlim(-0.5, Lx + 0.5)
+    # Title inside plot (optional)
+    ax.text(Lx / 2, h_m + 0.5, "TYPICAL REINFORCEMENT DETAIL", ha='center', fontsize=12, fontweight='bold')
+
     ax.axis('off')
+    ax.set_ylim(-0.8, h_m + 0.8)
+    ax.set_xlim(-0.5, Lx + 0.5)
     return fig
 
 
 # ==========================================
-# 4. REPORT GENERATOR
+# 4. REPORT GENERATOR (HTML/PDF FRIENDLY)
 # ==========================================
 def generate_html(inputs, rows, img_b64, summary):
     today_str = date.today().strftime("%d/%m/%Y")
 
-    table_html = ""
+    table_rows_html = ""
     for r in rows:
         if r[0] == "SECTION":
-            table_html += f"<tr class='sec-row'><td colspan='6'>{r[1]}</td></tr>"
+            table_rows_html += f"<tr class='sec-row'><td colspan='6'>{r[1]}</td></tr>"
         else:
-            cls = "status-ok" if r[5] in ["OK", "PASS"] else "status-fail"
-            table_html += f"""
+            cls = "status-pass" if r[5] in ["OK", "PASS"] else ("status-fail" if r[5] in ["FAIL", "WARN"] else "")
+            table_rows_html += f"""
             <tr>
                 <td>{r[0]}</td>
-                <td style='color:#555;'>{r[1]}</td>
+                <td style='color:#666;'>{r[1]}</td>
                 <td>{r[2]}</td>
-                <td class='bold-val'>{r[3]}</td>
-                <td class='center-val'>{r[4]}</td>
+                <td class='bold'>{r[3]}</td>
+                <td class='center'>{r[4]}</td>
                 <td class='{cls}'>{r[5]}</td>
             </tr>
             """
 
     html = f"""
-    <div class="success-box no-print">
-        <span class="success-icon">✅</span> คำนวณเสร็จสิ้น (Calculation Finished)
+    <div class="custom-success-box no-print">
+        <span style="margin-right:10px;">✅</span> คำนวณเสร็จสิ้น (Calculation Finished)
     </div>
 
-    <div class="print-container no-print">
-        <button onclick="window.print()" class="print-btn-green">🖨️ Print This Page / พิมพ์หน้านี้</button>
+    <div class="no-print" style="text-align: center; margin-bottom: 20px;">
+        <button onclick="window.print()" class="print-btn-green">
+            <span class="print-icon">🖨️</span> Print This Page / พิมพ์หน้านี้
+        </button>
     </div>
 
     <div class="report-container">
         <div class="report-header">
             <div class="id-box">{inputs['slab_id']}</div>
             <div class="report-title">ENGINEERING DESIGN REPORT</div>
-            <div class="report-subtitle">RC Two-Way Slab Design SDM</div>
+            <div class="report-subtitle">RC Slab Design SDM</div>
         </div>
 
         <div class="info-box">
@@ -359,15 +390,15 @@ def generate_html(inputs, rows, img_b64, summary):
 
         <div class="summary-grid">
             <div class="summary-card">
-                <div class="card-title">Short Span (+)</div>
+                <div class="card-head">Short Span (+)</div>
                 <div class="card-val">{summary['short']}</div>
             </div>
             <div class="summary-card">
-                <div class="card-title">Long Span (+)</div>
+                <div class="card-head">Long Span (+)</div>
                 <div class="card-val">{summary['long']}</div>
             </div>
             <div class="summary-card">
-                <div class="card-title">Support (-)</div>
+                <div class="card-head">Support (-)</div>
                 <div class="card-val">{summary['supp']}</div>
             </div>
         </div>
@@ -390,12 +421,13 @@ def generate_html(inputs, rows, img_b64, summary):
                 </tr>
             </thead>
             <tbody>
-                {table_html}
+                {table_rows_html}
             </tbody>
         </table>
 
-        <div style="margin-top:20px; font-size:11px; color:#888; text-align:center;">
-            Designed by: {inputs['engineer']}
+        <div style="margin-top:30px; border-top:1px solid #ddd; padding-top:10px; font-size:12px; color:#666; display:flex; justify-content:space-between;">
+            <div>RC Slab Design SDM - Streamlit App</div>
+            <div>Designed by: {inputs['engineer']}</div>
         </div>
     </div>
     """
@@ -403,7 +435,7 @@ def generate_html(inputs, rows, img_b64, summary):
 
 
 # ==========================================
-# 5. MAIN APP
+# 5. MAIN APPLICATION
 # ==========================================
 st.title("RC Slab Design SDM")
 
@@ -426,7 +458,7 @@ with st.sidebar.form("input_form"):
     fc = st.number_input("fc' (ksc)", 240.0)
     fy = st.number_input("fy (ksc)", 4000.0)
 
-    st.subheader("Parameters")
+    st.subheader("Design Params")
     case_opts = {1: "1. Simple", 2: "2. All Cont", 3: "3. One Short Discont", 4: "4. One Long Discont",
                  5: "5. Two Short Discont", 6: "6. Two Long Discont", 7: "7. Corner", 8: "8. One Long Cont",
                  9: "9. One Short Cont"}
@@ -439,7 +471,6 @@ if run:
     # 1. Calc
     short, long_s = min(Lx, Ly), max(Lx, Ly)
     m = short / long_s
-
     wd = 2400 * (h / 100) + sdl
     wu = 1.2 * wd + 1.6 * ll
 
@@ -494,11 +525,11 @@ if run:
         'supp': f"{main_bar}@{s_neg:.2f}" if s_neg > 0 else "-"
     }
 
-    fig = plot_slab_cad(Lx, h, cover, main_bar, s_pos, s_neg)
-    img_b64 = fig_to_base64(fig)
+    fig = plot_slab_cad_style(Lx, h, cover, main_bar, s_pos, s_neg)
+    img = fig_to_base64(fig)
 
     html = generate_html(
         {'project': project, 'slab_id': slab_id, 'engineer': engineer, 'Lx': Lx, 'Ly': Ly, 'fc': fc, 'fy': fy, 'h': h,
-         'cover': cover}, rows, img_b64, summary_data)
+         'cover': cover}, rows, img, summary_data)
 
     components.html(html, height=1400, scrolling=True)
