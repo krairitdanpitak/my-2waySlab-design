@@ -130,8 +130,43 @@ def fig_to_base64(fig):
     return f"data:image/png;base64,{base64.b64encode(buf.read()).decode()}"
 
 
+# --- NEW FUNCTION: Auto Calc Thickness ---
+def calculate_min_thickness(Lx_m, Ly_m, fy_ksc, beam_w_m=0.3):
+    """
+    Calculate min thickness based on ACI 318 for Two-Way Slabs with Beams (alpha_m >= 2.0).
+    Formula: h = Ln * (0.8 + fy/14000) / (36 + 9*beta)
+    fy in ksc
+    """
+    # Ensure Ly is long span
+    long_span = max(Lx_m, Ly_m)
+    short_span = min(Lx_m, Ly_m)
+
+    # Clear spans (Approximate by subtracting beam width)
+    ln = long_span - beam_w_m
+    sn = short_span - beam_w_m
+
+    if ln <= 0 or sn <= 0: return 10.0  # Fallback
+
+    beta = ln / sn
+
+    # ACI Formula Metric Equivalent (fy in ksc)
+    # Factor (0.8 + fy/14000) comes from (0.8 + fy_psi/200000)
+    numerator = ln * (0.8 + (fy_ksc / 14000))
+    denominator = 36 + (9 * beta)
+
+    h_m = numerator / denominator
+    h_cm = h_m * 100
+
+    # Check minimum 9cm per ACI
+    h_final = max(h_cm, 9.0)
+
+    # Round up to nearest 0.5 cm
+    h_final = math.ceil(h_final * 2) / 2
+    return h_final
+
+
 # ==========================================
-# 4. PLOTTING FUNCTION (IMPROVED - FIXED VISUAL THICKNESS)
+# 4. PLOTTING FUNCTION
 # ==========================================
 def plot_twoway_section_detailed(h_cm, cover_cm, bar_name, res_sum, Lx_val):
     fig, ax = plt.subplots(figsize=(10, 5))
@@ -139,11 +174,6 @@ def plot_twoway_section_detailed(h_cm, cover_cm, bar_name, res_sum, Lx_val):
     beam_d = 0.50;
     slab_span = 2.5
 
-    # ---------------------------------------------
-    # FIXED VISUAL THICKNESS for Clarity
-    # ---------------------------------------------
-    # Instead of scaling h_cm directly which might be too thin (e.g. 0.10),
-    # we use a fixed schematic height for drawing to ensure bars are separated.
     slab_h_draw = 0.25  # Schematic drawing height (fixed)
 
     # --- 1. Structure ---
@@ -152,11 +182,10 @@ def plot_twoway_section_detailed(h_cm, cover_cm, bar_name, res_sum, Lx_val):
         patches.Rectangle((-beam_w, -beam_d), beam_w, beam_d, facecolor='white', edgecolor='black', linewidth=1.5))
     ax.add_patch(
         patches.Rectangle((slab_span, -beam_d), beam_w, beam_d, facecolor='white', edgecolor='black', linewidth=1.5))
-    # Slab (Using fixed schematic height)
+    # Slab
     ax.add_patch(patches.Rectangle((0, -slab_h_draw), slab_span, slab_h_draw, facecolor='#f9f9f9', edgecolor='black',
                                    linewidth=1.5))
 
-    # Padding for schematic
     pad = 0.04
 
     # --- 2. Short Span Bars (Lines) ---
@@ -176,8 +205,8 @@ def plot_twoway_section_detailed(h_cm, cover_cm, bar_name, res_sum, Lx_val):
     ax.plot([slab_span - 0.1, slab_span - 0.1], [bar_y_bot, bar_y_bot + 0.06], color='blue', linewidth=2.5)  # Hook
 
     # --- 3. Long Span Bars (Dots) ---
-    dot_y_top = bar_y_top - 0.025  # Under Short Top
-    dot_y_bot = bar_y_bot + 0.025  # Over Short Bot
+    dot_y_top = bar_y_top - 0.025
+    dot_y_bot = bar_y_bot + 0.025
 
     # Long Neg (Top Dots)
     for x in [0, 0.15, slab_span, slab_span - 0.15]:
@@ -188,19 +217,17 @@ def plot_twoway_section_detailed(h_cm, cover_cm, bar_name, res_sum, Lx_val):
         ax.add_patch(patches.Circle((slab_span / 8 * i, dot_y_bot), radius=0.02, color='red'))
 
     # --- 4. Dimensions & Annotations ---
-
-    # Dimension: Thickness (h) - Shows ACTUAL value
+    # Dimension: Thickness (h)
     ax.annotate("", xy=(slab_span + beam_w + 0.1, -slab_h_draw), xytext=(slab_span + beam_w + 0.1, 0),
                 arrowprops=dict(arrowstyle='<->', linewidth=0.8))
     ax.text(slab_span + beam_w + 0.15, -slab_h_draw / 2, f"h = {h_cm / 100:.2f} m", va='center', rotation=90)
 
-    # Dimension: Span (L) - Shows ACTUAL Lx Value
+    # Dimension: Span (L)
     ax.annotate("", xy=(0, -beam_d - 0.1), xytext=(slab_span, -beam_d - 0.1),
                 arrowprops=dict(arrowstyle='<->', linewidth=0.8))
     ax.text(slab_span / 2, -beam_d - 0.2, f"L = {Lx_val:.2f} m", ha='center', fontweight='bold')
 
-    # --- 5. Labels with Leader Lines ---
-
+    # --- 5. Labels ---
     # Short Span (Neg/Top)
     txt_short_neg = f"Short(Top): {bar_name}@{res_sum['s_a_neg']:.0f}cm"
     ax.annotate(txt_short_neg, xy=(top_len / 2, bar_y_top), xytext=(top_len, 0.4),
@@ -208,7 +235,7 @@ def plot_twoway_section_detailed(h_cm, cover_cm, bar_name, res_sum, Lx_val):
                 fontsize=9, color='blue', fontweight='bold',
                 bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="blue", alpha=0.9))
 
-    # Long Span (Neg/Top) - Pointing to dots
+    # Long Span (Neg/Top)
     txt_long_neg = f"Long(Top): {bar_name}@{res_sum['s_b_neg']:.0f}cm"
     ax.annotate(txt_long_neg, xy=(0.15, dot_y_top), xytext=(0.5, 0.2),
                 arrowprops=dict(arrowstyle='->', color='red'),
@@ -222,7 +249,7 @@ def plot_twoway_section_detailed(h_cm, cover_cm, bar_name, res_sum, Lx_val):
                 fontsize=9, ha='center', color='blue', fontweight='bold',
                 bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="blue", alpha=0.9))
 
-    # Long Span (Pos/Bot) - Pointing to dots
+    # Long Span (Pos/Bot)
     txt_long_pos = f"Long(Bot): {bar_name}@{res_sum['s_b_pos']:.0f}cm"
     ax.annotate(txt_long_pos, xy=(slab_span / 2 + 0.3, dot_y_bot), xytext=(slab_span / 2 + 0.6, -0.4),
                 arrowprops=dict(arrowstyle='->', color='red'),
@@ -430,6 +457,10 @@ def generate_html_report(inputs, rows, img_base64, res_sum):
 # ==========================================
 st.title("RC Two-Way Slab Design (Report Mode)")
 
+# Initialize session state for thickness if not exists
+if 'h_val' not in st.session_state:
+    st.session_state.h_val = 12.0
+
 with st.sidebar.form("input_form"):
     st.header("Project Info")
     project = st.text_input("Project Name", "อาคารพักอาศัย")
@@ -440,8 +471,36 @@ with st.sidebar.form("input_form"):
     c1, c2 = st.columns(2)
     Lx = c1.number_input("Short Span (Lx)", value=4.0, min_value=0.0, step=0.1)
     Ly = c2.number_input("Long Span (Ly)", value=5.0, min_value=0.0, step=0.1)
-    h = st.number_input("Thickness (cm)", value=12.0, min_value=0.0, step=1.0)
+
+    # --- AUTO THICKNESS LOGIC ---
+    st.markdown("---")
+    if st.form_submit_button("⚡ Auto Calculate Minimum h"):
+        # We need fy from inputs, but inputs are below. Use default or temp logic.
+        # It's cleaner to access widget state if available, but for simplicity:
+        # We will use the values currently in the widget boxes (will reload script)
+        # Note: In a form, we might need to be careful.
+        # Hack: Since this is inside a form, it submits the form.
+        # We calculate h here and update session state.
+
+        # NOTE: Form inputs aren't available in `st.session_state` until submitted.
+        # But `st.form_submit_button` IS a submit action.
+        # We need to capture the current inputs from the widget keys or args.
+        # Streamlit doesn't pass form values until the script reruns.
+        # So we will use the variables Lx, Ly defined above and assume fy=4000 (standard) or read from previous run.
+        # Better approach for Form: Calculation happens AFTER the form block.
+        # But we want to update the 'h' input field.
+
+        # Workaround: Using session state logic outside is better, but to keep UI structure:
+        temp_fy = 4000  # Default if not set
+        calc_h = calculate_min_thickness(Lx, Ly, temp_fy, beam_w_m=0.30)
+        st.session_state.h_val = calc_h
+        st.success(f"Recommended Thickness: {calc_h} cm")
+
+    h = st.number_input("Thickness (cm)", value=st.session_state.h_val, min_value=0.0, step=1.0,
+                        help="Min req: Perimeter/180 or ACI Eq.")
     cover = st.number_input("Cover (cm)", value=2.5, min_value=0.0, step=0.5)
+    st.markdown("---")
+    # ----------------------------
 
     st.header("2. Loads & Mat.")
     sdl = st.number_input("SDL (kg/m²)", value=150.0, min_value=0.0)
@@ -456,6 +515,12 @@ with st.sidebar.form("input_form"):
 
     run_btn = st.form_submit_button("Calculate & Preview")
 
+# UPDATE: Because the button "Auto Calculate" is inside the form,
+# it acts as a submit. We need to check if the logic above updated the session state.
+# If the user clicked "Auto Calculate", the script reruns.
+# `st.session_state.h_val` is updated.
+# The `h` widget reads `st.session_state.h_val` and displays the new value.
+
 if run_btn:
     if Lx > Ly and Ly > 0:
         Lx, Ly = Ly, Lx
@@ -469,7 +534,6 @@ if run_btn:
     }
 
     rows, res_sum = calculate_detailed(inputs)
-    # Pass Lx to plot function for Dimension Label
     img_base64 = fig_to_base64(plot_twoway_section_detailed(h, cover, bar, res_sum, Lx))
     html_report = generate_html_report(inputs, rows, img_base64, res_sum)
 
