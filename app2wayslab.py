@@ -18,7 +18,6 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
 
-    /* CSS สำหรับการพิมพ์: ซ่อนส่วนที่ไม่ต้องการ */
     @media print {
         .no-print, .stAppHeader, .stSidebar, .stToolbar { display: none !important; }
         .main-content { margin: 0; padding: 0; }
@@ -26,59 +25,27 @@ st.markdown("""
         body { -webkit-print-color-adjust: exact; }
     }
 
-    /* ดีไซน์ปุ่มพิมพ์ตามรูป Screenshot (สีเขียว) */
     .print-btn-custom {
-        background-color: #4CAF50; /* Green */
-        border: none;
-        color: white !important;
-        padding: 10px 24px;
-        text-align: center;
-        text-decoration: none;
-        display: inline-block;
-        font-size: 16px;
-        margin-bottom: 20px;
-        cursor: pointer;
-        border-radius: 5px; 
-        font-family: 'Sarabun', sans-serif;
-        font-weight: bold;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        transition: 0.3s;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin: 0 auto; /* Center button */
+        background-color: #4CAF50; border: none; color: white !important;
+        padding: 10px 24px; text-align: center; text-decoration: none;
+        display: inline-flex; align-items: center; gap: 8px;
+        font-size: 16px; margin: 0 auto; cursor: pointer; border-radius: 5px; 
+        font-family: 'Sarabun', sans-serif; font-weight: bold;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: 0.3s;
     }
-    .print-btn-custom:hover {
-        background-color: #45a049;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-    }
-    .btn-container {
-        display: flex;
-        justify-content: center;
-        width: 100%;
-        margin-top: 20px;
-        margin-bottom: 20px;
-    }
+    .print-btn-custom:hover { background-color: #45a049; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
 # 2. DATABASE & CONSTANTS
 # ==========================================
-# Case Descriptions
 CASE_DESC = {
-    1: "All Continuous",
-    2: "Short Discontinuous",
-    3: "Long Discontinuous",
-    4: "2 Short + 1 Long Discont.",
-    5: "2 Long + 1 Short Discont.",
-    6: "2 Adjacent Discont.",
-    7: "1 Short Discont.",
-    8: "1 Long Discont.",
-    9: "All Discontinuous"
+    1: "All Continuous", 2: "Short Discontinuous", 3: "Long Discontinuous",
+    4: "2 Short + 1 Long Discont.", 5: "2 Long + 1 Short Discont.", 6: "2 Adjacent Discont.",
+    7: "1 Short Discont.", 8: "1 Long Discont.", 9: "All Discontinuous"
 }
 
-# ACI Method 2 Coefficients (Case 1-9)
 ACI_COEFFICIENTS = {
     1: {1.00: [0.033, 0.018, 0.027, 0.033, 0.018, 0.027], 0.95: [0.036, 0.020, 0.030, 0.033, 0.017, 0.026],
         0.90: [0.040, 0.023, 0.032, 0.033, 0.016, 0.025], 0.85: [0.045, 0.025, 0.035, 0.033, 0.015, 0.024],
@@ -138,17 +105,15 @@ def get_coefficients(case_num, m):
     table = ACI_COEFFICIENTS[case_num]
     if m in table: return table[m]
 
-    # Interpolation
     sorted_keys = sorted(table.keys())
     m1 = 0.5;
     m2 = 1.0
     for k in sorted_keys:
         if k <= m: m1 = k
         if k >= m: m2 = k; break
-
     if m1 == m2: return table[m1]
 
-    vals1 = table[m1]
+    vals1 = table[m1];
     vals2 = table[m2]
     interp_vals = []
     ratio = (m - m1) / (m2 - m1)
@@ -166,65 +131,102 @@ def fig_to_base64(fig):
 
 
 # ==========================================
-# 4. PLOTTING FUNCTION
+# 4. PLOTTING FUNCTION (IMPROVED)
 # ==========================================
-def plot_twoway_section(h_cm, cover_cm, main_bar, s_main):
-    fig, ax = plt.subplots(figsize=(8, 3.5))
+def plot_twoway_section_detailed(h_cm, cover_cm, bar_name, res_sum):
+    fig, ax = plt.subplots(figsize=(10, 5))
     beam_w = 0.30;
     beam_d = 0.50;
     slab_span = 2.5;
     slab_h = h_cm / 100.0
 
-    # Structure
+    # --- 1. Structure ---
+    # Beams
     ax.add_patch(
         patches.Rectangle((-beam_w, -beam_d), beam_w, beam_d, facecolor='white', edgecolor='black', linewidth=1.5))
     ax.add_patch(
         patches.Rectangle((slab_span, -beam_d), beam_w, beam_d, facecolor='white', edgecolor='black', linewidth=1.5))
+    # Slab
     ax.add_patch(
         patches.Rectangle((0, -slab_h), slab_span, slab_h, facecolor='#f9f9f9', edgecolor='black', linewidth=1.5))
 
-    # Rebar
     pad = 0.02 + (cover_cm / 100)
-    # Top Bars
-    top_len = slab_span * 0.25;
+
+    # --- 2. Short Span Bars (Lines) ---
     bar_y_top = -pad
-    ax.plot([-beam_w + 0.05, -beam_w + 0.05, top_len], [-beam_d / 2, bar_y_top, bar_y_top], color='black',
-            linewidth=2.0)
-    ax.plot([slab_span + beam_w - 0.05, slab_span + beam_w - 0.05, slab_span - top_len],
-            [-beam_d / 2, bar_y_top, bar_y_top], color='black', linewidth=2.0)
-
-    # Bottom Bars
     bar_y_bot = -slab_h + pad
-    ax.plot([0.1, slab_span - 0.1], [bar_y_bot, bar_y_bot], color='black', linewidth=2.0)
-    ax.plot([0.1, 0.1], [bar_y_bot, bar_y_bot + 0.05], color='black', linewidth=2.0)
-    ax.plot([slab_span - 0.1, slab_span - 0.1], [bar_y_bot, bar_y_bot + 0.05], color='black', linewidth=2.0)
+    top_len = slab_span * 0.25
 
-    # Dots (Temp/Dist)
-    dot_y_top = bar_y_top - 0.02;
-    dot_y_bot = bar_y_bot + 0.02
+    # Short Neg (Top Line)
+    ax.plot([-beam_w + 0.05, -beam_w + 0.05, top_len], [-beam_d / 2, bar_y_top, bar_y_top], color='black',
+            linewidth=2.0)  # Left
+    ax.plot([slab_span + beam_w - 0.05, slab_span + beam_w - 0.05, slab_span - top_len],
+            [-beam_d / 2, bar_y_top, bar_y_top], color='black', linewidth=2.0)  # Right
+
+    # Short Pos (Bot Line)
+    ax.plot([0.1, slab_span - 0.1], [bar_y_bot, bar_y_bot], color='black', linewidth=2.0)
+    ax.plot([0.1, 0.1], [bar_y_bot, bar_y_bot + 0.05], color='black', linewidth=2.0)  # Hook
+    ax.plot([slab_span - 0.1, slab_span - 0.1], [bar_y_bot, bar_y_bot + 0.05], color='black', linewidth=2.0)  # Hook
+
+    # --- 3. Long Span Bars (Dots) ---
+    dot_y_top = bar_y_top - 0.015  # Under Short Top
+    dot_y_bot = bar_y_bot + 0.015  # Over Short Bot
+
+    # Long Neg (Top Dots)
     for x in [0, 0.15, slab_span, slab_span - 0.15]:
         ax.add_patch(patches.Circle((x, dot_y_top), radius=0.015, color='black'))
+
+    # Long Pos (Bot Dots)
     for i in range(1, 8):
         ax.add_patch(patches.Circle((slab_span / 8 * i, dot_y_bot), radius=0.015, color='black'))
 
-    # Annotations
-    ax.annotate("", xy=(0, -slab_h - 0.2), xytext=(slab_span, -slab_h - 0.2),
-                arrowprops=dict(arrowstyle='<->', linewidth=0.8))
-    ax.text(slab_span / 2, -slab_h - 0.3, "Span L", ha='center')
-    ax.annotate(f"{main_bar}@{s_main:.0f} (Top)", xy=(top_len / 2, bar_y_top), xytext=(top_len, 0.3),
-                arrowprops=dict(arrowstyle='->'), fontsize=9)
-    ax.annotate(f"{main_bar}@{s_main:.0f} (Bot)", xy=(slab_span / 2, bar_y_bot), xytext=(slab_span / 2, -slab_h - 0.5),
-                arrowprops=dict(arrowstyle='->'), fontsize=9)
+    # --- 4. Dimensions & Annotations ---
 
-    ax.axis('off');
-    ax.set_ylim(-1.0, 0.5);
-    ax.set_xlim(-0.5, slab_span + 0.5)
+    # Dimension: Thickness (h)
+    ax.annotate("", xy=(slab_span + beam_w + 0.1, -slab_h), xytext=(slab_span + beam_w + 0.1, 0),
+                arrowprops=dict(arrowstyle='<->', linewidth=0.8))
+    ax.text(slab_span + beam_w + 0.15, -slab_h / 2, f"h = {h_cm / 100:.2f} m", va='center', rotation=90)
+
+    # Dimension: Span (L)
+    ax.annotate("", xy=(0, -beam_d - 0.1), xytext=(slab_span, -beam_d - 0.1),
+                arrowprops=dict(arrowstyle='<->', linewidth=0.8))
+    ax.text(slab_span / 2, -beam_d - 0.2, "Span L", ha='center')
+
+    # --- 5. Labels with Leader Lines ---
+
+    # Short Span (Neg/Top)
+    txt_short_neg = f"Short(Top): {bar_name}@{res_sum['s_a_neg']:.0f}cm"
+    ax.annotate(txt_short_neg, xy=(top_len / 2, bar_y_top), xytext=(top_len, 0.4),
+                arrowprops=dict(arrowstyle='->', connectionstyle="angle,angleA=0,angleB=90,rad=10"), fontsize=9,
+                bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.9))
+
+    # Long Span (Neg/Top) - Pointing to dots
+    txt_long_neg = f"Long(Top): {bar_name}@{res_sum['s_b_neg']:.0f}cm"
+    ax.annotate(txt_long_neg, xy=(0.15, dot_y_top), xytext=(0.5, 0.2),
+                arrowprops=dict(arrowstyle='->'), fontsize=9,
+                bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.9))
+
+    # Short Span (Pos/Bot)
+    txt_short_pos = f"Short(Bot): {bar_name}@{res_sum['s_a_pos']:.0f}cm"
+    ax.annotate(txt_short_pos, xy=(slab_span / 2, bar_y_bot), xytext=(slab_span / 2, -0.6),
+                arrowprops=dict(arrowstyle='->'), fontsize=9, ha='center',
+                bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.9))
+
+    # Long Span (Pos/Bot) - Pointing to dots
+    txt_long_pos = f"Long(Bot): {bar_name}@{res_sum['s_b_pos']:.0f}cm"
+    ax.annotate(txt_long_pos, xy=(slab_span / 2 + 0.3, dot_y_bot), xytext=(slab_span / 2 + 0.6, -0.4),
+                arrowprops=dict(arrowstyle='->'), fontsize=9,
+                bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.9))
+
+    ax.axis('off')
+    ax.set_ylim(-1.0, 0.6)
+    ax.set_xlim(-0.5, slab_span + 0.8)
     plt.tight_layout()
     return fig
 
 
 # ==========================================
-# 5. CALCULATION LOGIC (With Detailed Spacing)
+# 5. CALCULATION LOGIC
 # ==========================================
 def calculate_detailed(inputs):
     rows = []
@@ -240,7 +242,7 @@ def calculate_detailed(inputs):
     h = inputs['h'];
     cov = inputs['cover']
     fc = inputs['fc'];
-    fy = inputs['fy']
+    fy = inputs['fy'];
     bar_name = inputs['bar']
     Ab = BAR_INFO[bar_name]['A_cm2']
 
@@ -251,28 +253,24 @@ def calculate_detailed(inputs):
     row("Long Span", "Ly", "-", f"{Ly:.2f}", "m")
     row("Ratio m", "Lx / Ly", f"{Lx:.2f} / {Ly:.2f}", f"{m:.2f}", "-", "OK" if m >= 0.5 else "WARN")
 
-    # Loads
-    w_sw = 2400 * (h / 100)
-    w_dl = w_sw + inputs['sdl']
+    w_sw = 2400 * (h / 100);
+    w_dl = w_sw + inputs['sdl'];
     w_ll = inputs['ll']
     wu = 1.4 * w_dl + 1.7 * w_ll
-
     row("Dead Load", "SW + SDL", f"{w_sw:.0f} + {inputs['sdl']}", f"{w_dl:.0f}", "kg/m²")
-    row("Factored Load (wu)", "1.4DL + 1.7LL", f"1.4({w_dl:.0f}) + 1.7({w_ll})", f"{wu:.0f}", "kg/m²")
+    row("Factored Load", "1.4DL + 1.7LL", f"1.4({w_dl:.0f}) + 1.7({w_ll})", f"{wu:.0f}", "kg/m²")
 
     # 2. Moments & Design
     case_id = inputs['case']
-    sec(f"2. MOMENT & REINFORCEMENT (CASE {case_id}: {CASE_DESC[case_id]})")
+    sec(f"2. MOMENT & REINF. (CASE {case_id}: {CASE_DESC[case_id]})")
     coefs = get_coefficients(case_id, m)
 
-    # Effective Depth
     db = BAR_INFO[bar_name]['d_mm']
     d_short = h - cov - db / 20
-    d_long = d_short - db / 10  # Upper layer
-    S = Lx  # Short span length for moment calc
+    d_long = d_short - db / 10
+    S = Lx
 
-    # Helper functions
-    def calc_As(Mu_val, d_val):
+    def calc_As_Spacing(Mu_val, d_val):
         Mu_kgcm = Mu_val * 100
         Rn = Mu_kgcm / (0.9 * 100 * d_val ** 2)
         try:
@@ -280,58 +278,39 @@ def calculate_detailed(inputs):
         except:
             rho = 0.002
         As_req = max(rho * 100 * d_val, 0.0018 * 100 * h)
-        return As_req
-
-    def calc_spacing(As_req):
         s = (Ab * 100) / As_req
         s_final = math.floor(min(s, 3 * h, 45) * 2) / 2
-        return s, s_final
+        return As_req, s, s_final
 
-    # --- Short Neg (Top) ---
+    # --- Short Neg ---
     Ma_neg = coefs[0] * wu * S ** 2
-    As_a_neg = calc_As(Ma_neg, d_short)
-    s_calc_a_neg, s_a_neg = calc_spacing(As_a_neg)
-
+    As_a_neg, _, s_a_neg = calc_As_Spacing(Ma_neg, d_short)
     row("Ma (Neg)", "Ca_neg · wu · Lx²", f"{coefs[0]:.3f}·{wu:.0f}·{S}²", f"{Ma_neg:.2f}", "kg-m")
-    row("As (Short-Neg)", "Calc (Flexure)", f"d={d_short:.2f}", f"{As_a_neg:.2f}", "cm²")
-    # Spacing row
-    row("• Spacing (Neg)", f"Ab·100/As (Max {3 * h:.0f}, 45)", f"{Ab:.2f}·100/{As_a_neg:.2f} = {s_calc_a_neg:.1f}",
-        f"@{s_a_neg:.1f}", "cm", "OK")
+    row("As (Short-Neg)", "Calc", f"d={d_short:.2f}", f"{As_a_neg:.2f}", "cm²")
+    row("• Spacing", f"Use {bar_name}", f"Max {3 * h:.0f} cm", f"@{s_a_neg:.1f}", "cm", "OK")
 
-    # --- Short Pos (Bot) ---
+    # --- Short Pos ---
     Ma_pos = (coefs[1] * 1.4 * w_dl * S ** 2) + (coefs[2] * 1.7 * w_ll * S ** 2)
-    As_a_pos = calc_As(Ma_pos, d_short)
-    s_calc_a_pos, s_a_pos = calc_spacing(As_a_pos)
+    As_a_pos, _, s_a_pos = calc_As_Spacing(Ma_pos, d_short)
+    row("Ma (Pos)", "Ca_dl·D + Ca_ll·L", "-", f"{Ma_pos:.2f}", "kg-m")
+    row("As (Short-Pos)", "Calc", f"d={d_short:.2f}", f"{As_a_pos:.2f}", "cm²")
+    row("• Spacing", f"Use {bar_name}", f"Max {3 * h:.0f} cm", f"@{s_a_pos:.1f}", "cm", "OK")
 
-    row("Ma (Pos)", "Ca_dl·1.4D + Ca_ll·1.7L", f"Details omitted", f"{Ma_pos:.2f}", "kg-m")
-    row("As (Short-Pos)", "Calc (Flexure)", f"d={d_short:.2f}", f"{As_a_pos:.2f}", "cm²")
-    row("• Spacing (Pos)", f"Ab·100/As (Max {3 * h:.0f}, 45)", f"{Ab:.2f}·100/{As_a_pos:.2f} = {s_calc_a_pos:.1f}",
-        f"@{s_a_pos:.1f}", "cm", "OK")
-
-    # --- Long Neg (Top) ---
+    # --- Long Neg ---
     Mb_neg = coefs[3] * wu * S ** 2
-    As_b_neg = calc_As(Mb_neg, d_long)
-    s_calc_b_neg, s_b_neg = calc_spacing(As_b_neg)
-
+    As_b_neg, _, s_b_neg = calc_As_Spacing(Mb_neg, d_long)
     row("Mb (Neg)", "Cb_neg · wu · Lx²", f"{coefs[3]:.3f}·{wu:.0f}·{S}²", f"{Mb_neg:.2f}", "kg-m")
-    row("As (Long-Neg)", "Calc (Flexure)", f"d={d_long:.2f}", f"{As_b_neg:.2f}", "cm²")
-    row("• Spacing (Neg)", f"Ab·100/As (Max {3 * h:.0f}, 45)", f"{Ab:.2f}·100/{As_b_neg:.2f} = {s_calc_b_neg:.1f}",
-        f"@{s_b_neg:.1f}", "cm", "OK")
+    row("As (Long-Neg)", "Calc", f"d={d_long:.2f}", f"{As_b_neg:.2f}", "cm²")
+    row("• Spacing", f"Use {bar_name}", f"Max {3 * h:.0f} cm", f"@{s_b_neg:.1f}", "cm", "OK")
 
-    # --- Long Pos (Bot) ---
+    # --- Long Pos ---
     Mb_pos = (coefs[4] * 1.4 * w_dl * S ** 2) + (coefs[5] * 1.7 * w_ll * S ** 2)
-    As_b_pos = calc_As(Mb_pos, d_long)
-    s_calc_b_pos, s_b_pos = calc_spacing(As_b_pos)
+    As_b_pos, _, s_b_pos = calc_As_Spacing(Mb_pos, d_long)
+    row("Mb (Pos)", "Cb_dl·D + Cb_ll·L", "-", f"{Mb_pos:.2f}", "kg-m")
+    row("As (Long-Pos)", "Calc", f"d={d_long:.2f}", f"{As_b_pos:.2f}", "cm²")
+    row("• Spacing", f"Use {bar_name}", f"Max {3 * h:.0f} cm", f"@{s_b_pos:.1f}", "cm", "OK")
 
-    row("Mb (Pos)", "Cb_dl·1.4D + Cb_ll·1.7L", f"Details omitted", f"{Mb_pos:.2f}", "kg-m")
-    row("As (Long-Pos)", "Calc (Flexure)", f"d={d_long:.2f}", f"{As_b_pos:.2f}", "cm²")
-    row("• Spacing (Pos)", f"Ab·100/As (Max {3 * h:.0f}, 45)", f"{Ab:.2f}·100/{As_b_pos:.2f} = {s_calc_b_pos:.1f}",
-        f"@{s_b_pos:.1f}", "cm", "OK")
-
-    res_sum = {
-        's_a_neg': s_a_neg, 's_a_pos': s_a_pos,
-        's_b_neg': s_b_neg, 's_b_pos': s_b_pos
-    }
+    res_sum = {'s_a_neg': s_a_neg, 's_a_pos': s_a_pos, 's_b_neg': s_b_neg, 's_b_pos': s_b_pos}
 
     sec("3. CHECK SHEAR")
     Vu = wu * Lx / 3
@@ -344,7 +323,7 @@ def calculate_detailed(inputs):
 
 
 # ==========================================
-# 6. HTML REPORT GENERATOR
+# 6. HTML REPORT
 # ==========================================
 def generate_html_report(inputs, rows, img_base64, res_sum):
     table_rows = ""
@@ -357,20 +336,8 @@ def generate_html_report(inputs, rows, img_base64, res_sum):
                 status_class = "pass-no"
             elif "WARN" in r[5]:
                 status_class = "pass-warn"
-
-            # Highlight Spacing Rows
-            bg_style = "background-color:#f9fbe7;" if "Spacing" in r[0] else ""
-
-            table_rows += f"""
-            <tr style="{bg_style}">
-                <td>{r[0]}</td>
-                <td>{r[1]}</td>
-                <td>{r[2]}</td>
-                <td style='color:#D32F2F; font-weight:bold;'>{r[3]}</td>
-                <td>{r[4]}</td>
-                <td class='{status_class}'>{r[5]}</td>
-            </tr>
-            """
+            bg = "background-color:#f9fbe7;" if "Spacing" in r[0] else ""
+            table_rows += f"<tr style='{bg}'><td>{r[0]}</td><td>{r[1]}</td><td>{r[2]}</td><td style='color:#D32F2F; font-weight:bold;'>{r[3]}</td><td>{r[4]}</td><td class='{status_class}'>{r[5]}</td></tr>"
 
     html = f"""
     <!DOCTYPE html>
@@ -379,50 +346,34 @@ def generate_html_report(inputs, rows, img_base64, res_sum):
         <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
         <style>
             body {{ font-family: 'Sarabun', sans-serif; padding: 20px; }}
-            .header {{ border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; position: relative; }}
-            .id-box {{ position: absolute; top:0; right:0; border: 2px solid #000; padding: 5px 15px; font-weight: bold; font-size: 18px; }}
-            .info-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }}
-            .info-box {{ border: 1px solid #ddd; padding: 10px; }}
             .report-table {{ width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 20px; }}
             .report-table th, .report-table td {{ border: 1px solid #444; padding: 8px; }}
             .report-table th {{ background-color: #eee; text-align: center; }}
             .pass-ok {{ color: green; font-weight: bold; }}
             .pass-no {{ color: red; font-weight: bold; }}
-
-            .footer {{ margin-top: 40px; page-break-inside: avoid; }}
-            .sign-box {{ width: 250px; text-align: center; margin-top: 20px; }}
-            .line {{ border-bottom: 1px solid #000; margin: 30px 0 5px 0; }}
-
-            /* Class to hide elements when printing */
-            @media print {{
-               .no-print {{ display: none !important; }}
-            }}
+            @media print {{ .no-print {{ display: none !important; }} }}
         </style>
     </head>
     <body>
         <div class="no-print" style="text-align: center; margin-bottom: 20px;">
-            <button onclick="window.print()" style="
-                background-color: #4CAF50; border: none; color: white; padding: 12px 24px;
-                text-align: center; display: inline-flex; align-items: center; gap: 8px;
-                font-size: 16px; cursor: pointer; border-radius: 5px; font-family: 'Sarabun'; font-weight: bold;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+            <button onclick="window.print()" style="background-color: #4CAF50; border: none; color: white; padding: 12px 24px; display: inline-flex; align-items: center; gap: 8px; font-size: 16px; cursor: pointer; border-radius: 5px; font-family: 'Sarabun'; font-weight: bold;">
                 🖨️ Print This Page / พิมพ์หน้านี้
             </button>
         </div>
 
-        <div class="header">
-            <div class="id-box">{inputs['slab_id']}</div>
+        <div style="border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; position: relative;">
+            <div style="position: absolute; top:0; right:0; border: 2px solid #000; padding: 5px 15px; font-weight: bold;">{inputs['slab_id']}</div>
             <h1 style="text-align:center; margin:0;">ENGINEERING DESIGN REPORT</h1>
             <h3 style="text-align:center; margin:5px;">RC Two-Way Slab Design (ACI Method 2)</h3>
         </div>
 
-        <div class="info-grid">
-            <div class="info-box">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+            <div style="border: 1px solid #ddd; padding: 10px;">
                 <strong>Project:</strong> {inputs['project']}<br>
                 <strong>Engineer:</strong> {inputs['engineer']}<br>
                 <strong>Date:</strong> 16/12/2568
             </div>
-            <div class="info-box">
+            <div style="border: 1px solid #ddd; padding: 10px;">
                 <strong>Size:</strong> {inputs['Lx']} x {inputs['Ly']} m (Case {inputs['case']})<br>
                 <strong>Thickness:</strong> {inputs['h']} cm (Cover {inputs['cover']} cm)<br>
                 <strong>Materials:</strong> fc'={inputs['fc']}, fy={inputs['fy']} ksc
@@ -431,23 +382,18 @@ def generate_html_report(inputs, rows, img_base64, res_sum):
 
         <h3 style="text-align:center;">Design Visualization</h3>
         <div style="text-align:center; border:1px solid #eee; padding:10px;">
-            <img src="{img_base64}" style="max-width:80%; height:auto;" />
+            <img src="{img_base64}" style="max-width:90%; height:auto;" />
         </div>
 
         <h3>Calculation Details</h3>
         <table class="report-table">
             <thead>
-                <tr>
-                    <th width="25%">Item</th><th width="20%">Formula</th><th width="20%">Substitution</th>
-                    <th width="15%">Result</th><th width="10%">Unit</th><th width="10%">Status</th>
-                </tr>
+                <tr><th width="25%">Item</th><th width="20%">Formula</th><th width="20%">Substitution</th><th width="15%">Result</th><th width="10%">Unit</th><th width="10%">Status</th></tr>
             </thead>
-            <tbody>
-                {table_rows}
-            </tbody>
+            <tbody>{table_rows}</tbody>
         </table>
 
-        <div class="footer">
+        <div style="margin-top: 40px; page-break-inside: avoid;">
             <h4>Reinforcement Summary (Use {inputs['bar']})</h4>
             <ul>
                 <li><strong>Short Span (Neg/Top):</strong> @ {res_sum['s_a_neg']:.1f} cm</li>
@@ -455,10 +401,9 @@ def generate_html_report(inputs, rows, img_base64, res_sum):
                 <li><strong>Long Span (Neg/Top):</strong> @ {res_sum['s_b_neg']:.1f} cm</li>
                 <li><strong>Long Span (Pos/Bot):</strong> @ {res_sum['s_b_pos']:.1f} cm</li>
             </ul>
-
-            <div class="sign-box">
+            <div style="width: 250px; text-align: center; margin-top: 20px;">
                 <div style="text-align: left; font-weight: bold;">Designed by:</div>
-                <div class="line"></div>
+                <div style="border-bottom: 1px solid #000; margin: 30px 0 5px 0;"></div>
                 <div>({inputs['engineer']})</div>
                 <div>Civil Engineer</div>
             </div>
@@ -494,10 +439,8 @@ with st.sidebar.form("input_form"):
     fy = st.number_input("fy (ksc)", value=4000.0, min_value=0.0)
 
     st.header("3. Design Parameters")
-    # Updated: Format the dropdown to show ID + Description
     case = st.selectbox("Case Type (Edge Conditions)", range(1, 10), index=0,
                         format_func=lambda x: f"{x}: {CASE_DESC[x]}")
-
     bar = st.selectbox("Rebar Size", list(BAR_INFO.keys()), index=1)
 
     run_btn = st.form_submit_button("Calculate & Preview")
@@ -514,13 +457,11 @@ if run_btn:
         'case': case, 'bar': bar
     }
 
-    # Process
     rows, res_sum = calculate_detailed(inputs)
-    img_base64 = fig_to_base64(plot_twoway_section(h, cover, bar, res_sum['s_a_pos']))
+    img_base64 = fig_to_base64(plot_twoway_section_detailed(h, cover, bar, res_sum))
     html_report = generate_html_report(inputs, rows, img_base64, res_sum)
 
     st.success("✅ Design Complete! See report below.")
     components.html(html_report, height=1300, scrolling=True)
-
 else:
     st.info("👈 Enter design parameters in the sidebar to generate report.")
